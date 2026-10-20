@@ -123,11 +123,6 @@ describe('static lookups on the seeded LMT fixture', () => {
       expect(await code(h.q.getArrivals({ stop_id: 'lmt:route:5', within_minutes: 30, limit: 5 }))).toBe('invalid_argument');
       expect(await code(h.q.getArrivals({ stop_id: 'lmt:stop:22', provider: 'lmt', within_minutes: 30, limit: 5 }))).toBe('no error');
     });
-
-    it('plan_trip is a stub until the planner lands', async () => {
-      const p = h.q.planTrip({ origin: { stop_id: '22' }, destination: { stop_id: '1' }, max_transfers: 1, wheelchair_accessible: false });
-      await expect(p).rejects.toMatchObject({ code: 'internal' });
-    });
   });
 });
 

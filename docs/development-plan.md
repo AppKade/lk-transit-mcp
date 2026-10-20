@@ -367,3 +367,38 @@ zero coordinate leakage. Platform availability and provider freshness are tracke
 - Gates G1 and G3 closed; G0 closed or the public endpoint is explicitly limited to pilot users
 - A fresh developer can clone, run `pnpm dev`, ingest the fixture, and call every tool in under 30 minutes
 - Documentation set from M7 published, with `DATA_SOURCES.md` recording authority status for the LMT feeds
+
+## 14. Implementation status (updated after the first build)
+
+Built and tested offline on recorded LMT fixtures and smoke-tested against the live feeds: M0-M6 in code
+(241 tests, strict typecheck clean). Not done: G0 (LMT authorisation), the 7-day soak (G1), production deployment,
+and the items under "Open work" below.
+
+### Deviations from the plan, and why
+
+| Plan | Built | Reason |
+|---|---|---|
+| Postgres + PostGIS | Plain Postgres: lat/lon bounding box + haversine | Network is tiny (220 stops); PostGIS unavailable locally. Revisit at national scale |
+| Join realtime to timetable by trip id | Resolve by route short name + direction; arrivals merge on route/direction/stop with a time tolerance | LMT realtime trip ids (`LMT_CM01_0_WP-NE-5208`) never equal static trip ids; realtime route id is the short name, static is a UUID |
+| Speed in m/s (GTFS-RT spec) | Provider setting `speedUnit: 'kmh'`, converted on ingest | LMT values reach ~79, only plausible as km/h |
+| MCP spec 2026-07-28 | SDK 1.32.1 negotiates 2025-11-25 | Latest the installed SDK supports; the requirement document's version could not be verified |
+| Occupancy out of scope (Phase 3) | Occupancy passed through on vehicles | LMT already publishes it |
+
+### Findings about the live data
+
+- Static feed: 7 routes (CM06 has no trips), 220 stops, 56 trips, one daily calendar to 2027-12-31, no `calendar_dates`.
+- Vehicle/trip-update entity timestamps can lag the feed header by up to ~30 min, so per-entity freshness is worse than
+  header freshness. Queries filter on entity age.
+- The alerts feed was empty when captured.
+
+### Open work
+
+1. G0: written confirmation from LMT / the `seyone.dev` maintainer.
+2. Derived (GPS-based) ETA (`derived_live`) and its evaluation harness; not built.
+3. Verify on a real Workers deployment: Durable Object alarms and storage (hub state is one storage key), Neon from
+   Workers (a pool per query today), R2 archive, static-ingest CPU limits (spike S4).
+4. Global rate limiting on Workers (Durable Object or Rate Limiting binding); the default limiter is per isolate.
+5. `GET /v1/stops/{id}` and the `transit://stops/{id}` resource (no stop getter in the query API yet).
+6. Metrics endpoint, dashboards and alert rules (only structured logs exist).
+7. `@lkt/db` should expose `neon` separately so Workers bundles do not pull in PGlite.
+8. MobilityData GTFS validator in CI; 7-day soak run against G1; docs set from M7 (SECURITY.md, THREAT_MODEL.md, etc.).

@@ -79,12 +79,14 @@ function resolvePlace(cfg: ProviderConfig, net: Network, place: PlanTripInput['o
 }
 
 /** Trip runs that can still be caught in [fromMs, toMs], over the service days that may overlap it (>24:00 times included). */
-function instantiate(net: Network, catalog: Catalog, fromMs: number, toMs: number, wheelchairOnly: boolean): Inst[] {
+function instantiate(net: Network, catalog: Catalog, fromMs: number, toMs: number, wheelchairOnly: boolean): { runs: Inst[]; hadService: boolean } {
   const out: Inst[] = [];
+  let hadService = false;
   const lastDate = colomboDate(toMs);
   for (let date = addDays(colomboDate(fromMs), -1); date <= lastDate; date = addDays(date, 1)) {
     const services = new Set(activeServices(catalog.calendar, date));
     if (services.size === 0) continue;
+    if (date >= colomboDate(fromMs)) hadService = true;
     const start = serviceDayStartMs(date);
     for (const trip of net.trips) {
       if (!services.has(trip.serviceId) || (wheelchairOnly && trip.wheelchair !== 1)) continue;
@@ -94,7 +96,8 @@ function instantiate(net: Network, catalog: Catalog, fromMs: number, toMs: numbe
       out.push({ trip, date, arr, dep, live: dep.map(() => false) });
     }
   }
-  return out.sort((a, b) => a.dep[0]! - b.dep[0]! || a.trip.tripId.localeCompare(b.trip.tripId) || a.date.localeCompare(b.date));
+  out.sort((a, b) => a.dep[0]! - b.dep[0]! || a.trip.tripId.localeCompare(b.trip.tripId) || a.date.localeCompare(b.date));
+  return { runs: out, hadService };
 }
 
 const hhmm = (ms: number) => toColomboIso(ms).slice(11, 16);
@@ -139,7 +142,7 @@ export async function planTrip(env: QueryEnv, input: PlanTripInput): Promise<Env
     assumptions.push(`Live trip updates are stale (${tuFeed.age_seconds} s old), so timetable times are used.`);
   }
 
-  const insts = instantiate(net, catalog, depMs, horizonEnd, wheelchairOnly);
+  const { runs: insts, hadService } = instantiate(net, catalog, depMs, horizonEnd, wheelchairOnly);
   if (tuFeed.status === 'fresh') overlayLive(net, insts, snapshot, now);
 
   const originStops = new Set(origin.stops.map((c) => c.stop.idx));
@@ -169,16 +172,16 @@ export async function planTrip(env: QueryEnv, input: PlanTripInput): Promise<Env
   const freshness = tuFeed.status !== 'fresh' || liveUsed ? tuFeed : staticFreshness(feed, now, env.today());
   const result: Envelope<Journey[]> & { notes?: string[] } = envelopeOf(cfg, now, feed, liveUsed ? 'mixed' : 'gtfs_static', urlRef, freshness, data);
   if (data.length === 0) {
-    result.notes = [...assumptions, noJourneyReason(origin, dest, targetMeters.size, insts.length, depMs, maxTransfers)];
+    result.notes = [...assumptions, noJourneyReason(origin, dest, targetMeters.size, hadService, depMs, maxTransfers)];
   }
   return result;
 }
 
-function noJourneyReason(origin: Endpoint, dest: Endpoint, targets: number, runs: number, depMs: number, maxTransfers: number): string {
+function noJourneyReason(origin: Endpoint, dest: Endpoint, targets: number, hadService: boolean, depMs: number, maxTransfers: number): string {
   if (origin.stops.length === 0) return `No served stop within ${COORD_RADIUS_M} m of the origin coordinates.`;
   if (dest.stops.length === 0) return `No served stop within ${COORD_RADIUS_M} m of the destination coordinates.`;
   if (targets === 0) return 'Origin and destination are served by the same nearby stop; walking is the better option.';
-  if (runs === 0) return `No scheduled service found on ${colomboDate(depMs)} (or the previous service day) in the timetable.`;
+  if (!hadService) return `No scheduled service found from ${colomboDate(depMs)} within the search horizon.`;
   return (
     `No journey with at most ${maxTransfers} transfer(s) found for boardings between ${hhmm(depMs)} and ${hhmm(depMs + HORIZON_MS)} ` +
     `(${HORIZON_MS / 3_600_000}-hour search horizon); a later departure or more transfers may work.`
