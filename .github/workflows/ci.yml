@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 2 * * *' # nightly live-feed check (02:23 UTC)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: Typecheck server (incl. scripts)
+        run: npx tsc --noEmit -p apps/server/tsconfig.json
+      - name: Unit, contract and end-to-end tests
+        run: npx vitest run
+
+  worker-bundle:
+    # Proves the Cloudflare entry bundles (no account or secrets needed). Not a substitute for a staging deploy.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Bundle Worker (dry run)
+        working-directory: apps/server
+        run: npx --yes wrangler@4 deploy --dry-run --outdir dist --env=""
+
+  audit:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    continue-on-error: true # advisory until the dependency policy is agreed
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm audit --prod --audit-level=high
+
+  live-check:
+    # Nightly: decode the real LMT feeds. Upstream is a community-hosted source, so this never blocks merges.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fetch and decode live LMT feeds
+        run: npx tsx apps/server/scripts/live-check.ts

@@ -1,0 +1,49 @@
+# Cloudflare Workers deployment for the REST + MCP server.  Run from apps/server:
+#   npx wrangler deploy --dry-run --outdir dist     # bundle check, no account needed
+#   npx wrangler secret put DATABASE_URL            # Neon connection string (pooled host)
+#   npx wrangler secret put API_KEYS                # optional: name=secret[@tier],...
+#   npx wrangler deploy
+# Untested against a real account/runtime; see docs/api.md ("Deploying to Cloudflare").
+
+name = "lk-transit-mcp"
+main = "src/worker.ts"
+compatibility_date = "2025-09-15"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+# Exact browser origins allowed for CORS and /mcp (comma separated). Empty = non-browser clients only.
+ALLOWED_ORIGINS = ""
+ALLOW_ANONYMOUS = "true"
+RATE_LIMIT_ANON_PER_MIN = "30"
+RATE_LIMIT_KEY_PER_MIN = "120"
+
+# Secrets (never in this file): DATABASE_URL, API_KEYS
+
+[durable_objects]
+bindings = [{ name = "REALTIME_HUB", class_name = "RealtimeHubDO" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RealtimeHubDO"]
+
+[triggers]
+# Hourly static GTFS check (conditional on checksum; atomic activation). Realtime polling uses DO alarms, not cron.
+crons = ["7 * * * *"]
+
+[observability]
+enabled = true
+
+# Optional archive of GTFS zips and sampled raw GTFS-RT payloads. Create the bucket first
+# (npx wrangler r2 bucket create lk-transit-archive), then uncomment:
+# [[r2_buckets]]
+# binding = "ARCHIVE"
+# bucket_name = "lk-transit-archive"
+
+# Separate environment for staging (own Neon branch via its own DATABASE_URL secret):
+#   npx wrangler deploy --env staging
+[env.staging]
+name = "lk-transit-mcp-staging"
+vars = { ALLOWED_ORIGINS = "", ALLOW_ANONYMOUS = "true" }
+durable_objects = { bindings = [{ name = "REALTIME_HUB", class_name = "RealtimeHubDO" }] }
+triggers = { crons = ["17 * * * *"] }

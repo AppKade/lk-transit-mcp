@@ -13,5 +13,14 @@
     "@hono/node-server": "^1.13.0",
     "@modelcontextprotocol/sdk": "^1.20.0",
     "hono": "^4.6.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/node.ts",
+    "start": "tsx src/node.ts",
+    "test": "vitest run --root ../.. apps/server",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "live-check": "tsx scripts/live-check.ts",
+    "migrate": "tsx scripts/migrate.ts",
+    "cf:dry-run": "wrangler deploy --dry-run --outdir dist"
   }
 }

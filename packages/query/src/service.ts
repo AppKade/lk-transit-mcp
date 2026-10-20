@@ -1,8 +1,8 @@
-import { ToolError } from '@lkt/core';
 import { getArrivals } from './arrivals.js';
 import { getServiceAlerts } from './alerts.js';
 import { QueryEnv } from './env.js';
 import { findStopsNearby } from './nearby.js';
+import { planTrip } from './plan.js';
 import { getRoute, searchRoutes } from './routes.js';
 import { getFeedStatus, listProviders } from './status.js';
 import type { QueryContext, TransitQueries } from './types.js';
@@ -19,8 +19,6 @@ export function createTransitQueries(ctx: QueryContext): TransitQueries {
     getRoute: (input) => getRoute(env, input),
     getServiceAlerts: (input) => getServiceAlerts(env, input),
     getFeedStatus: (input) => getFeedStatus(env, input),
-    planTrip: async () => {
-      throw new ToolError('internal', 'plan_trip not implemented yet');
-    },
+    planTrip: (input) => planTrip(env, input),
   };
 }
