@@ -390,6 +390,9 @@ export class RealtimeHub implements RealtimeSource {
     switch (key) {
       case 'vehicle_positions': {
         const r = normalizeVehicles(decoded, { nowMs: now });
+        if (this.provider.speedUnit === 'kmh') {
+          for (const v of r.items) if (v.speed_mps !== null) v.speed_mps = v.speed_mps / 3.6;
+        }
         await this.resolveVehicles(r.items, ctx);
         this.vehicles = r.items;
         return { count: r.items.length, quarantined: r.quarantined };

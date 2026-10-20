@@ -1,4 +1,30 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["packages/*/src", "packages/*/test", "apps/*/src", "apps/*/test"]
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "apps/*/src",
+    "apps/*/test",
+    "test"
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@lkt/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@lkt/db": [
+        "packages/db/src/index.ts"
+      ],
+      "@lkt/gtfs": [
+        "packages/gtfs/src/index.ts"
+      ],
+      "@lkt/ingest": [
+        "packages/ingest/src/index.ts"
+      ],
+      "@lkt/query": [
+        "packages/query/src/index.ts"
+      ]
+    }
+  }
 }

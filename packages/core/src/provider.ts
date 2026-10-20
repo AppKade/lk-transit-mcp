@@ -23,6 +23,11 @@ export interface ProviderConfig {
   pollIntervalSeconds: number;
   /** Static feed re-check interval. */
   staticCheckIntervalSeconds: number;
+  /**
+   * Unit of VehiclePosition.speed as published. GTFS-RT specifies m/s, but LMT's feed values (up to ~79) are
+   * only plausible as km/h, so the hub converts to m/s on ingest for providers marked 'kmh'.
+   */
+  speedUnit?: 'mps' | 'kmh';
 }
 
 export const LMT: ProviderConfig = {
@@ -31,6 +36,7 @@ export const LMT: ProviderConfig = {
   timezone: 'Asia/Colombo',
   pollIntervalSeconds: 15,
   staticCheckIntervalSeconds: 3600,
+  speedUnit: 'kmh',
   sources: [
     { key: 'lmt.gtfs', kind: 'gtfs_static', url: 'https://api.transit.seyone.dev/api/v1/gtfs/download?agency=LMT' },
     {

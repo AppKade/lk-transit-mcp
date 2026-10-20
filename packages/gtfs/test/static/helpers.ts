@@ -9,7 +9,9 @@ export const FIXTURE_ZIP = fileURLToPath(new URL('../../../../fixtures/lmt/gtfs.
 export const TODAY = '2026-10-20';
 
 export type Files = Record<string, string>;
-export type Table = Record<string, string>[];
+/** Loosely typed CSV row: tests poke at arbitrary columns (values are strings). */
+export type Row = Record<string, any>;
+export type Table = Row[];
 
 export const fixtureBytes = (): Uint8Array => new Uint8Array(readFileSync(FIXTURE_ZIP));
 
@@ -23,7 +25,7 @@ export function fixtureFiles(): Files {
 export const zip = (files: Files): Uint8Array => zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])));
 
 export function readTable(files: Files, name: string): Table {
-  return Papa.parse<Record<string, string>>(files[name]!, { header: true, skipEmptyLines: true }).data;
+  return Papa.parse<Row>(files[name]!, { header: true, skipEmptyLines: true }).data;
 }
 
 /** Applies `fn` to a table of the fixture; `fn` may mutate in place or return a replacement. */

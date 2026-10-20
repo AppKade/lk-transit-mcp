@@ -95,7 +95,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: Vars }> {
     } finally {
       const route = routePath(c, -1);
       const info = c.get('info');
-      log.log(c.res.status >= 500 ? 'error' : 'info', 'http_request', {
+      log.log(c.res.status === 500 ? 'error' : c.res.status >= 500 || c.res.status === 429 ? 'warn' : 'info', 'http_request', {
         trace_id: traceId,
         method: c.req.method,
         route: route === '/*' || route === '*' || route.endsWith('/*') ? '(unmatched)' : route,

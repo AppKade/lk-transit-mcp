@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GtfsParseError, parseGtfsZip, prepareGtfs, reportForParseError, validateGtfs } from '../../src/static/index.js';
 import type { ValidationOptions, ValidationReport } from '../../src/static/index.js';
 import { TODAY, editTable, fixtureBytes, fixtureFiles, fixtureWith, readTable, without } from './helpers.js';
-import type { Files } from './helpers.js';
+import type { Files, Table } from './helpers.js';
 
 const opts: ValidationOptions = { today: TODAY };
 const validate = (bytes: Uint8Array, o: ValidationOptions = opts) => validateGtfs(parseGtfsZip(bytes), o);
@@ -10,7 +10,7 @@ const rules = (r: ValidationReport, severity?: 'error' | 'warning') =>
   r.issues.filter((i) => !severity || i.severity === severity).map((i) => i.rule);
 
 /** Rewrites the stop_times of the first `n` trips with `fn(rows of that trip)`. */
-const breakTrips = (n: number, fn: (rows: Record<string, string>[]) => void) => (f: Files) =>
+const breakTrips = (n: number, fn: (rows: Table) => void) => (f: Files) =>
   editTable(f, 'stop_times.txt', (rows) => {
     const ids = [...new Set(rows.map((r) => r.trip_id))].slice(0, n);
     for (const id of ids) fn(rows.filter((r) => r.trip_id === id));
